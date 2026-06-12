@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ERC20 Balance Checker</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.7.0/ethers.umd.min.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; text-align: center; margin-top: 50px; }
+        button { padding: 10px 20px; font-size: 16px; cursor: pointer; background-color: #f6851b; color: white; border: none; border-radius: 5px;}
+        button:hover { background-color: #e27618; }
+        #result { margin-top: 20px; font-size: 20px; font-weight: bold; color: #28a745; }
+        #error { margin-top: 20px; color: red; }
+    </style>
+</head>
+<body>
+
+    <h2>Mein ERC20 Token Guthaben</h2>
+    <p>Prüfe das Guthaben deiner aktuell in MetaMask ausgewählten Adresse.</p>
+    
+    <button id="checkBalanceBtn">Guthaben abfragen</button>
+    
+    <div id="result"></div>
+    <div id="error"></div>
+
+    <script>
+        // Smart Contract Adresse
+        const CONTRACT_ADDRESS = "0xaFce5796322e8E0DEbf8aB80274f7Fc3f7968188";
+
+        // Die minimale ABI, um mit dem Vertrag zu sprechen
+        const MINIMAL_ABI = [
+            "function balanceOf(address account) view returns (uint256)",
+            "function decimals() view returns (uint8)",
+            "function symbol() view returns (string)"
+        ];
+
+        document.getElementById('checkBalanceBtn').addEventListener('click', async () => {
+            const resultDiv = document.getElementById('result');
+            const errorDiv = document.getElementById('error');
+            
+            resultDiv.innerText = "Lade Daten aus der Blockchain...";
+            errorDiv.innerText = "";
+
+            if (typeof window.ethereum === 'undefined') {
+                errorDiv.innerText = "Fehler: MetaMask ist nicht installiert!";
+                resultDiv.innerText = "";
+                return;
+            }
+
+            try {
+                // MetaMask verbinden und aktuellen Account abrufen
+                const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+                const currentAccount = accounts[0]; // Die aktuell ausgewählte Adresse
+
+                // Provider initialisieren und Netzwerk prüfen
+                const provider = new ethers.BrowserProvider(window.ethereum);
+                const network = await provider.getNetwork();
+                
+                if (network.chainId !== 11155111n) {
+                    errorDiv.innerText = "Fehler: Bitte wechsle in MetaMask zum Sepolia Testnetzwerk!";
+                    resultDiv.innerText = "";
+                    return;
+                }
+
+                // Verbindung zum Smart Contract herstellen
+                const contract = new ethers.Contract(CONTRACT_ADDRESS, MINIMAL_ABI, provider);
+
+                // Daten aus dem Smart Contract abfragen
+                const rawBalance = await contract.balanceOf(currentAccount);
+                const decimals = await contract.decimals();
+                const symbol = await contract.symbol();
+
+                // Den Wert formatieren
+                const formattedBalance = ethers.formatUnits(rawBalance, decimals);
+                
+                // Ergebnis anzeigen
+                resultDiv.innerText = `Adresse: ${currentAccount.substring(0, 6)}...${currentAccount.substring(38)}\n` +
+                                      `Guthaben: ${formattedBalance} ${symbol}`;
+
+            } catch (error) {
+                console.error(error);
+                errorDiv.innerText = "Ein Fehler ist aufgetreten. Hast du die Contract Adresse im Code ersetzt? Fehlerdetails: " + error.message;
+                resultDiv.innerText = "";
+            }
+        });
+    </script>
+</body>
+</html>
